@@ -1,0 +1,11 @@
+build
+cache
+.cabal-sandbox
+cabal.sandbox.config
+elm.js
+elm-stuff
+*.html
+repl-*.elm
+*~
+.project
+.DS_Store
