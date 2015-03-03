@@ -2,7 +2,7 @@
 
 import Svg (..)
 import Svg.Attributes (..)
-import Html (Html)
+import Html
 import Window
 import Signal (Signal, (<~), (~), sampleOn, foldp)
 import List (map, (::), head, tail)
@@ -34,11 +34,13 @@ color = "#7FD13B"
 
 --
 
-updateFigure (x', y') figure =
-  let w' = x' - figure.x
-      h' = y' - figure.y
+updateFigure (x2, y2) figure =
+  let x' = if x2 < figure.x then x2 else figure.x
+      y' = if y2 < figure.y then y2 else figure.y
+      w' = abs <| x2 - figure.x
+      h' = abs <| y2 - figure.y
   in
-      { figure | w <- w', h <- h' }
+      { figure | x <- x', y <- y', w <- w', h <- h' }
 
 finishCreatingFigure input state =
   { state | isFirstClick <- True
@@ -72,7 +74,10 @@ view (winW, winH) model =
             strW = toString figure.w
             strH = toString figure.h
         in
-            rect [ fill color, x strX, y strY, width strW, height strH ] []
+            rect
+              [ fill color, x strX, y strY,
+                width strW, height strH ]
+              []
   in
       svg
         [ version "1.1", width strW, height strH, viewBox strViewBox ]
@@ -80,5 +85,5 @@ view (winW, winH) model =
 
 --
 
-main : Signal Html
+main : Signal Html.Html
 main = view <~ Window.dimensions ~ model
