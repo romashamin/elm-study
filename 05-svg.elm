@@ -5,7 +5,7 @@ import Svg.Attributes (..)
 import Html
 import Window
 import Signal (Signal, (<~), (~), sampleOn, foldp)
-import List (map, (::), head, tail)
+import List (map, (::), head, tail, append)
 import Mouse
 
 --
@@ -64,8 +64,10 @@ model = foldp update initialState input
 
 --
 
-view (winW, winH) model =
-  let strW = toString winW
+view (winW, winH) (mouseX, mouseY) model =
+  let strMX = toString mouseX
+      strMY = toString mouseY
+      strW = toString winW
       strH = toString winH
       strViewBox = "0 0 " ++ strW ++ " " ++ strH
       drawFigure figure =
@@ -81,9 +83,16 @@ view (winW, winH) model =
   in
       svg
         [ version "1.1", width strW, height strH, viewBox strViewBox ]
-        (map drawFigure model.figures)
+        (append
+          (map drawFigure model.figures)
+          [ line [ x1 strMX, y1 "0", x2 strMX, y2 strH
+                 , stroke "#f0f", strokeWidth "0.05" ] []
+          , line [ x1 "0", y1 strMY, x2 strW, y2 strMY
+                 , stroke "#f0f", strokeWidth "0.05" ] []
+          ]
+        )
 
 --
 
 main : Signal Html.Html
-main = view <~ Window.dimensions ~ model
+main = view <~ Window.dimensions ~ Mouse.position ~ model
