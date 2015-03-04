@@ -42,10 +42,18 @@ updateFigure (x2, y2) figure =
   in
       { figure | x <- x', y <- y', w <- w', h <- h' }
 
-finishCreatingFigure input state =
-  { state | isFirstClick <- True
-          , figures <- (state.figures |> head |> updateFigure input)
-                       :: tail state.figures }
+finishCreatingFigure (x2, y2) state =
+  let sizeTreshold = 5
+      currentFigure = state.figures |> head
+      isFigureTooSmall =
+        (abs (x2 - currentFigure.x) <= sizeTreshold) &&
+        (abs (y2 - currentFigure.y) <= sizeTreshold)
+  in
+      { state | isFirstClick <- True
+              , figures <- if isFigureTooSmall
+                    then tail state.figures
+                    else (currentFigure |> updateFigure (x2, y2))
+                         :: tail state.figures }
 
 startCreatingFigure (x',y') state =
   let newFigure = { x = x', y = y', w = 0, h = 0 }
