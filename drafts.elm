@@ -1,13 +1,13 @@
 import Text (asText)
+import Html
+import Svg (..)
+import Svg.Attributes (..)
 
-data = 4
 
-x2 x = 2 * x
-x3 x = 3 * x
-
-minus2 x = x - 2
-
-pipe1 = minus2 >> x2 >> x3
-pipe2 = x2 >> minus2 >> x3
-
-main = data |> pipe1 |> asText
+main : Html.Html
+main =
+  svg
+    [ version "1.1", width "800", height "600", viewBox "0 0 800 600" ]
+    [ rect [ fill "black", x "100", y "100", width "40", height "40" ] []
+    , text [ x "100", y "160" ] [ Html.text "Hello!" ]
+    ]

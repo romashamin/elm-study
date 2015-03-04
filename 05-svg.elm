@@ -77,18 +77,26 @@ view (winW, winH) (mouseX, mouseY) model =
             strH = toString figure.h
         in
             rect
-              [ fill color, x strX, y strY,
-                width strW, height strH ]
+              [ fill color, x strX, y strY
+              , width strW, height strH ]
               []
   in
       svg
         [ version "1.1", width strW, height strH, viewBox strViewBox ]
         (append
           (map drawFigure model.figures)
-          [ line [ x1 strMX, y1 "0", x2 strMX, y2 strH
-                 , stroke "#f0f", strokeWidth "0.05" ] []
-          , line [ x1 "0", y1 strMY, x2 strW, y2 strMY
-                 , stroke "#f0f", strokeWidth "0.05" ] []
+          [ line
+              [ x1 strMX, y1 "0", x2 strMX, y2 strH
+              , stroke "#f0f", strokeWidth "0.05" ]
+              []
+          , line
+              [ x1 "0", y1 strMY, x2 strW, y2 strMY
+              , stroke "#f0f", strokeWidth "0.05" ]
+              []
+          , text
+              [ x "0", y "8"
+              , fontFamily "Inconsolata LGC", fontSize "8" ]
+              [ Html.text <| toString <| model.figures ]
           ]
         )
 
