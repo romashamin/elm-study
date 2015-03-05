@@ -1,13 +1,13 @@
 import Text (asText)
-import Html
-import Svg (..)
-import Svg.Attributes (..)
+import List (filter, head)
 
+figures =
+  [ { id = 1, x = 100, y = 100, isSelected = True }
+  , { id = 2, x = 300, y = 100, isSelected = False }
+  , { id = 3, x = 500, y = 100, isSelected = False }
+  ]
 
-main : Html.Html
-main =
-  svg
-    [ version "1.1", width "800", height "600", viewBox "0 0 800 600" ]
-    [ rect [ fill "black", x "100", y "100", width "40", height "40" ] []
-    , text [ x "100", y "160" ] [ Html.text "Hello!" ]
-    ]
+figureWithId id =
+  filter (\f -> f.id == id) figures
+
+main = asText <| head <| figureWithId 2
