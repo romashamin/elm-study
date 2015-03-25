@@ -1,13 +1,35 @@
+import Signal (Signal, (<~), (~), map, keepWhen, sampleOn, foldp, merge)
+import List ((::))
+import Mouse
 import Text (asText)
-import List (filter, head)
+import Time (fps)
 
-figures =
-  [ { id = 1, x = 100, y = 100, isSelected = True }
-  , { id = 2, x = 300, y = 100, isSelected = False }
-  , { id = 3, x = 500, y = 100, isSelected = False }
-  ]
+type Update = MouseClicks (Int,Int) | MouseDrags (Int,Int)
 
-figureWithId id =
-  filter (\f -> f.id == id) figures
+state =
+  { figures = []
+  , currentPos = { x = 0, y = 0 }
+  }
 
-main = asText <| head <| figureWithId 2
+inputs : Signal Update
+inputs =
+  merge
+    (map MouseClicks (sampleOn Mouse.isDown Mouse.position))
+    (map MouseDrags (keepWhen Mouse.isDown (0,0) Mouse.position))
+
+update input state =
+  case input of
+    MouseClicks coords ->
+      { state | figures <- coords :: state.figures }
+
+    MouseDrags (x,y) ->
+      let updateCurrentPos pos x' y' =
+            { pos | x <- x', y <- y' }
+      in
+          { state | currentPos <- updateCurrentPos state.currentPos x y }
+
+
+currentState =
+  foldp update state inputs
+
+main = asText <~ currentState
