@@ -2,6 +2,8 @@
 
 import Text (asText, plainText)
 import Signal (Signal, (<~), (~), map, keepWhen, sampleOn, foldp, merge)
+import List ((::), append)
+import List
 import Mouse
 import Window
 import Svg
@@ -10,37 +12,42 @@ import Html
 
 --
 
-type alias Figure = { id:Int, x:Int, y:Int, w:Int, h:Int, isSelected:Bool }
+type alias Figure = { id:Int, x1:Int, y1:Int, x2:Int, y2:Int, isSelected:Bool }
 
 type Update = MouseClicks (Int,Int) | MouseDrags (Int,Int)
 
 state =
   { isStartCreating = True
   , figures = []
-  , tempFigure = { id = -1, x = 0, y = 0, w = 0, h = 0, isSelected = False }
-  , currentPos = { x = 0, y = 0 }
+  , tempFigure = { id = -1, x1 = 0, y1 = 0, x2 = 0, y2 = 0, isSelected = False }
   }
+
+sizeTreshold = 20
+pColor = "#F8E71C"
+sColor = "#7FD13B"
 
 --
 
-updateWH fig (x', y') =
-  { fig | w <- abs <| x' - fig.x
-        , h <- abs <| y' - fig.y }
+updateFigX2Y2 fig (x', y') = { fig | x2 <- x', y2 <- y' }
+
+startNewTempFig fig (x', y') =
+  { fig | id <- fig.id + 1 , x1 <- x', x2 <- x', y1 <- y', y2 <- y' }
 
 finishCreatingFigure coords state =
-  { state | isStartCreating <- True
-          , tempFigure <- updateWH state.tempFigure coords }
-
-updateXY fig (x', y') =
-  { fig | x <- x', y <- y' }
-
-updateCurrentPos pos (x', y') =
-  { pos | x <- x', y <- y' }
+  let isFigureTooSmall fig =
+        (abs (fig.x1 - fig.x2) <= sizeTreshold) &&
+        (abs (fig.y1 - fig.y2) <= sizeTreshold)
+  in
+      { state | isStartCreating <- True
+              , tempFigure <- updateFigX2Y2 state.tempFigure coords
+              , figures <-
+                  if isFigureTooSmall state.tempFigure
+                    then state.figures
+                    else state.tempFigure :: state.figures }
 
 startCreatingFigure coords state =
   { state | isStartCreating <- False
-          , tempFigure <- updateXY state.tempFigure coords
-          , currentPos <- updateCurrentPos state.currentPos coords }
+          , tempFigure <- startNewTempFig state.tempFigure coords}
 
 update input state =
   case input of
@@ -50,10 +57,9 @@ update input state =
         else finishCreatingFigure coords state
 
     MouseDrags coords ->
-      { state | currentPos <- updateCurrentPos state.currentPos coords }
+      { state | tempFigure <- updateFigX2Y2 state.tempFigure coords }
 
-currentState =
-  foldp update state updates
+currentState = foldp update state updates
 
 updates : Signal Update
 updates =
@@ -63,28 +69,40 @@ updates =
 
 --
 
+drawFigure color opacity' fig =
+  let strX = toString (if fig.x1 < fig.x2 then fig.x1 else fig.x2)
+      strY = toString (if fig.y1 < fig.y2 then fig.y1 else fig.y2)
+      strW = toString <| abs <| fig.x1 - fig.x2
+      strH = toString <| abs <| fig.y1 - fig.y2
+  in
+      Svg.rect
+        [ fill color, opacity opacity', x strX, y strY, width strW, height strH ]
+        []
+
+drawRegularFigure = drawFigure pColor "0.85"
+drawTempFigure = drawFigure sColor "0.5"
+
 view (w,h) state =
   let strW = toString w
       strH = toString h
       strViewBox = "0 0 " ++ strW ++ " " ++ strH
-      strTmpX = toString state.tempFigure.x
-      strTmpY = toString state.tempFigure.y
-      strTmpW = toString <| abs <| state.currentPos.x - state.tempFigure.x
-      strTmpH = toString <| abs <| state.currentPos.y - state.tempFigure.y
-      s = " (" ++ strTmpX ++ "," ++ strTmpY ++ "," ++ strTmpW ++ "," ++ strTmpH ++ ")"
+      showMouseDragging =
+        if state.isStartCreating
+          then Svg.rect [ fill "#fff", x "0", y "0", width "0", height "0" ] []
+          else drawTempFigure state.tempFigure
   in
-    Svg.svg
-      [ version "1.1", width strW, height strH, viewBox strViewBox ]
-      [ Svg.rect
-          [ fill "#F8E71C", x strTmpX, y strTmpY, width strTmpW, height strTmpH ]
-          []
-      , Svg.text
-          [ x "0", y "8"
-          , fontFamily "Inconsolata LGC", fontSize "8" ]
-          [ Html.text <| (toString state) ++ s ] ]
+      Svg.svg
+        [ version "1.1", width strW, height strH, viewBox strViewBox ]
+        (append
+          (List.map drawRegularFigure state.figures)
+          [ showMouseDragging
+          , Svg.text
+              [ x "0", y "8"
+              , fontFamily "Inconsolata LGC", fontSize "8" ]
+              [ Html.text <| (toString state) ] ]
+          )
 
 --
 
 main : Signal Html.Html
-main =
-  view <~ Window.dimensions ~ currentState
+main = view <~ Window.dimensions ~ currentState
