@@ -5,6 +5,7 @@ import Signal
 import List ((::))
 import List
 import Mouse
+import Window
 import Html
 import Html.Attributes (style, for, id, type', value, checked)
 import Html.Events (onClick)
@@ -15,7 +16,7 @@ type ToolName = SelectTool | RectangleTool | CircleTool
 type alias Tool = { name:ToolName, active:Bool, icon:Svg.Svg }
 
 type FigureType = Rectangle | Circle
-type alias Figure = { type':FigureType, pos:(Int,Int) }
+type alias Figure = { type':FigureType, x:Int, y:Int }
 
 type Input = SetActive ToolName | MouseClicks (Int,Int)
 
@@ -33,27 +34,42 @@ state =
       , { name = CircleTool, active = False, icon = svgCircleIcon }
       ]
   , figures = []
+  , isPreventDefault = False
   }
+
+pColor = "#F8E71C"
+sColor = "#7FD13B"
+figureSize = 40
+
+--
 
 update input state =
   case input of
     SetActive toolName ->
       let setActiveByName tName t =
             { t | active <- if t.name == tName then True else False }
+          prevDef = not <| toolName == SelectTool
       in
-          { state | tools <- List.map (setActiveByName toolName) state.tools }
+          { state | tools <- List.map (setActiveByName toolName) state.tools
+                  , isPreventDefault <- prevDef }
 
-    MouseClicks coords ->
+    MouseClicks (x',y') ->
       let activeTool = List.head <| List.filter (\t -> t.active) state.tools
           addNewFigure figureType =
-              let newFigure = { type' = figureType, pos = coords }
+              let newFigure = { type' = figureType, x = x', y = y' }
               in
                   { state | figures <- newFigure :: state.figures }
       in
           case activeTool.name of
             SelectTool -> state
-            RectangleTool -> addNewFigure Rectangle
-            CircleTool -> addNewFigure Circle
+            RectangleTool ->
+              if state.isPreventDefault
+                then { state | isPreventDefault <- False }
+                else addNewFigure Rectangle
+            CircleTool ->
+              if state.isPreventDefault
+                then { state | isPreventDefault <- False }
+                else addNewFigure Circle
 
 toolsChannel = Signal.channel (SetActive SelectTool)
 
@@ -68,17 +84,53 @@ currentState = foldp update state input
 --
 
 main : Signal Html.Html
-main = (view toolsChannel) <~ currentState
+main = (view toolsChannel) <~ Window.dimensions ~ currentState
 
 --
 
-view toolsChannel state =
-  Html.div []
-    (List.concat
-      [ [ Html.div [ toolbarStyle ]
-            (List.map (toolbarButton toolsChannel) state.tools) ]
-      , [ Html.div [][ Html.text <| (toString state) ] ]
-      ])
+view toolsChannel (w,h) state =
+  let strW = toString w
+      strH = toString h
+      strViewBox = "0 0 " ++ strW ++ " " ++ strH
+  in
+      Html.div [ rootStyle ]
+        [ Svg.svg
+            [ SA.width strW, SA.height strH, SA.viewBox strViewBox ]
+            (List.map drawRegularFigure state.figures)
+        , Html.div []
+            (List.concat
+              [ [ Html.div
+                    [ toolbarStyle ]
+                    (List.map (toolbarButton toolsChannel) state.tools) ]
+              {-, [ Html.div
+                    [ debugTextStyle ]
+                    [ Html.text <| (toString state) ] ]-}
+              ])
+        ]
+
+drawRegularFigure = drawFigure pColor "0.9"
+
+drawFigure color opacity' { type', x, y } =
+  let halfSize = round <| figureSize / 2
+      strSize = toString figureSize
+  in
+      case type' of
+        Rectangle ->
+          let strX = toString <| x - halfSize
+              strY = toString <| y - halfSize
+          in
+              Svg.rect
+                [ SA.fill color, SA.fillOpacity opacity'
+                , SA.x strX, SA.y strY, SA.width strSize, SA.height strSize ][]
+
+        Circle ->
+          let strX = toString x
+              strY = toString y
+              strRadius = toString halfSize
+          in
+              Svg.circle
+                [ SA.fill color, SA.fillOpacity opacity'
+                , SA.cx strX, SA.cy strY, SA.r strRadius ][]
 
 toolbarButton toolsChannel { name, active, icon } =
   Html.button
@@ -88,6 +140,14 @@ toolbarButton toolsChannel { name, active, icon } =
     [ icon ]
 
 --
+
+rootStyle =
+  style
+    [ ("-webkit-user-select","none")
+    , ("-moz-user-select","none")
+    , ("user-select","none")
+    , ("cursor","default")
+    ]
 
 toolbarStyle =
   style
@@ -99,7 +159,9 @@ toolbarStyle =
     ]
 
 toolbarToolStyle isActive =
-  let bgColor = if isActive then "#3A393A" else "#7A797A"
+  -- rgba(122,121,122,0.85) rgba(58,57,58,0.85) "#3A393A" "#7A797A"
+  let bgColor =
+        if isActive then "rgba(58,57,58,0.75)" else "rgba(122,121,122,0.75)"
   in
       style
         [ ("margin-bottom","1px")
@@ -120,3 +182,13 @@ iconStyle =
     , ("transform","translateX(0)")
     , ("-ms-transform","translate(0.5px, -0.3px)")
     ]
+
+{- debugTextStyle =
+  style
+    [ ("position","fixed")
+    , ("top","10px")
+    , ("left","10px")
+    , ("right","60px")
+    , ("font-family","Inconsolata LGC")
+    , ("font-size","8px")
+    ]-}
