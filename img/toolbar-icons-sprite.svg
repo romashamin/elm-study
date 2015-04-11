@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none;">
+  <symbol id="icon-select-tool" viewBox="0 0 44 44"><path d="M16.2,14.1l10.2,7.5L23.5,22L22,22.1l0.8,1.3l3.6,6.2l-1.7,1L21,24.4l-0.8-1.3l-0.9,1.2l-1.7,2.3L16.2,14.1 M14.9,11.9 l1.9,17.4l3.3-4.4l4.1,7.1l3.5-2l-4.1-7.1l5.4-0.6L14.9,11.9L14.9,11.9z"/></symbol>
+  <symbol id="icon-rectangle-tool" viewBox="0 0 44 44"><path d="M31,15v14H13V15H31 M32,14H12v16h20V14L32,14z"/></symbol>
+  <symbol id="icon-circle-tool" viewBox="0 0 44 44"><path d="M22,13c5,0,9,4,9,9s-4,9-9,9s-9-4-9-9S17,13,22,13 M22,12c-5.5,0-10,4.5-10,10s4.5,10,10,10s10-4.5,10-10S27.5,12,22,12 L22,12z"/></symbol>
+</svg>
