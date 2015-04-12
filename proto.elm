@@ -28,11 +28,13 @@ type alias Figure =
   , x2:Int, y2:Int
   , status:FigureStatus }
 
+type FigureCreatingStatus = Ready | InProgress
+
 type alias State =
   { tools:List Tool
   , figures:List Figure
   , tempFigure:Figure
-  , isStartCreating:Bool
+  , figureCreatingStatus:FigureCreatingStatus
   }
 
 type Input = SetActiveTool ToolName
@@ -57,7 +59,7 @@ state =
   , tempFigure =
       { id = -1, type' = Rectangle
       , x1 = 0, y1 = 0, x2 = 0, y2 = 0, status = Idle }
-  , isStartCreating = True
+  , figureCreatingStatus = Ready
   }
 
 sizeTreshold = 20
@@ -77,7 +79,7 @@ finishCreatingFigure coords state =
         (abs (fig.x1 - fig.x2) <= sizeTreshold) &&
         (abs (fig.y1 - fig.y2) <= sizeTreshold)
   in
-      { state | isStartCreating <- True
+      { state | figureCreatingStatus <- Ready
               , tempFigure <- updateFigX2Y2 state.tempFigure coords
               , figures <-
                   if isFigureTooSmall state.tempFigure
@@ -85,7 +87,7 @@ finishCreatingFigure coords state =
                     else state.tempFigure :: state.figures }
 
 startCreatingFigure figureType coords state =
-  { state | isStartCreating <- False
+  { state | figureCreatingStatus <- InProgress
           , tempFigure <- startNewTempFig state.tempFigure figureType coords}
 
 update input state =
@@ -107,7 +109,7 @@ update input state =
           if activeTool.name == SelectTool
             then state
             else
-              if state.isStartCreating
+              if state.figureCreatingStatus == Ready
                 then startCreatingFigure figureType coords state
                 else finishCreatingFigure coords state
 
@@ -141,7 +143,7 @@ view toolsChannel (w,h) state =
       strH = toString h
       strViewBox = "0 0 " ++ strW ++ " " ++ strH
       showMouseDragging =
-        if state.isStartCreating
+        if state.figureCreatingStatus == Ready
           then drawEmptyFigure
           else drawTempFigure state.tempFigure
   in
