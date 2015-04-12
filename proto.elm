@@ -68,8 +68,9 @@ sColor = "#7FD13B"
 
 updateFigX2Y2 fig (x', y') = { fig | x2 <- x', y2 <- y' }
 
-startNewTempFig fig (x', y') =
-  { fig | id <- fig.id + 1 , x1 <- x', x2 <- x', y1 <- y', y2 <- y' }
+startNewTempFig fig figureType (x', y') =
+  { fig | id <- fig.id + 1, type' <- figureType
+        , x1 <- x', x2 <- x', y1 <- y', y2 <- y' }
 
 finishCreatingFigure coords state =
   let isFigureTooSmall fig =
@@ -83,12 +84,17 @@ finishCreatingFigure coords state =
                     then state.figures
                     else state.tempFigure :: state.figures }
 
-startCreatingFigure coords state =
+startCreatingFigure figureType coords state =
   { state | isStartCreating <- False
-          , tempFigure <- startNewTempFig state.tempFigure coords}
+          , tempFigure <- startNewTempFig state.tempFigure figureType coords}
 
 update input state =
   let activeTool = List.head <| List.filter (\t -> t.active) state.tools
+      figureType =
+        case activeTool.name of
+          RectangleTool -> Rectangle
+          CircleTool -> Circle
+          otherwise -> Rectangle
   in
       case input of
         SetActiveTool toolName ->
@@ -98,11 +104,11 @@ update input state =
                   | tools <- List.map (setActiveByName toolName) state.tools }
 
         MouseClicks coords ->
-          case activeTool.name of
-            SelectTool -> state
-            otherwise ->
+          if activeTool.name == SelectTool
+            then state
+            else
               if state.isStartCreating
-                then startCreatingFigure coords state
+                then startCreatingFigure figureType coords state
                 else finishCreatingFigure coords state
 
         MouseDrags coords ->
@@ -160,6 +166,11 @@ drawRegularFigure = drawFigure pColor "0.85"
 drawTempFigure = drawFigure sColor "0.5"
 
 drawFigure color opacity' fig =
+  case fig.type' of
+    Rectangle -> drawRectangle color opacity' fig
+    Circle -> drawCircle color opacity' fig
+
+drawRectangle color opacity' fig =
   let strX = toString (if fig.x1 < fig.x2 then fig.x1 else fig.x2)
       strY = toString (if fig.y1 < fig.y2 then fig.y1 else fig.y2)
       strW = toString <| abs <| fig.x1 - fig.x2
@@ -168,6 +179,18 @@ drawFigure color opacity' fig =
       Svg.rect
         [ SA.fill color, SA.fillOpacity opacity'
         , SA.x strX, SA.y strY, SA.width strW, SA.height strH ][]
+
+drawCircle color opacity' fig =
+  let halfW = (fig.x2 - fig.x1) // 2
+      halfH = (fig.y2 - fig.y1) // 2
+      strCX = toString <| fig.x1 + halfW
+      strCY = toString <| fig.y1 + halfH
+      strRX = toString <| abs <| halfW
+      strRY = toString <| abs <| halfH
+  in
+      Svg.ellipse
+        [ SA.fill color, SA.fillOpacity opacity'
+        , SA.cx strCX, SA.cy strCY, SA.rx strRX, SA.ry strRY ][]
 
 drawEmptyFigure =
   Svg.rect
