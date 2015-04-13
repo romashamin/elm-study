@@ -37,7 +37,10 @@ type alias State =
   , figureCreatingStatus:FigureCreatingStatus
   }
 
-type Input = SetActiveTool ToolName
+type Input = NoOp
+           | SetActiveTool ToolName
+           | SelectFigure Int
+           | UnselectAllFigures
            | MouseClicks (Int,Int)
            | MouseDrags (Int,Int)
 
@@ -65,6 +68,7 @@ state =
 sizeTreshold = 20
 pColor = "#F8E71C"
 sColor = "#7FD13B"
+selColor = "#037BFF"
 
 --
 
@@ -97,13 +101,33 @@ update input state =
           RectangleTool -> Rectangle
           CircleTool -> Circle
           otherwise -> Rectangle
+      unselectedFigures =
+        List.map (\f -> { f | status <- Idle } ) state.figures
   in
       case input of
+        NoOp -> state
+
         SetActiveTool toolName ->
           let setActiveByName tName t = { t | active <- t.name == tName }
           in
               { state
                   | tools <- List.map (setActiveByName toolName) state.tools }
+
+        SelectFigure figureId ->
+          let toggleSelection status =
+                if status == Idle then Selected else Idle
+              toggleById f =
+                if f.id == figureId
+                  then { f | status <- toggleSelection f.status }
+                  else f
+              figures' = unselectedFigures
+                {-if state.isShiftPressed
+                  then state.figures else unselectedFigures-}
+          in
+              { state | figures <- List.map toggleById figures' }
+
+        UnselectAllFigures ->
+          { state | figures <- unselectedFigures }
 
         MouseClicks coords ->
           if activeTool.name == SelectTool
@@ -120,11 +144,13 @@ update input state =
               { state | tempFigure <- updateFigX2Y2 state.tempFigure coords }
 
 toolsChannel = Signal.channel (SetActiveTool SelectTool)
+selectChannel = Signal.channel (NoOp)
 
 input : Signal Input
 input =
   Signal.mergeMany
     [ Signal.subscribe toolsChannel
+    , Signal.subscribe selectChannel
     , Signal.map MouseClicks (Signal.sampleOn Mouse.isDown Mouse.position)
     , Signal.map MouseDrags (Signal.keepWhen Mouse.isDown (0,0) Mouse.position)
     ]
@@ -134,11 +160,11 @@ currentState = foldp update state input
 --
 
 main : Signal Html.Html
-main = (view toolsChannel) <~ Window.dimensions ~ currentState
+main = view <~ Window.dimensions ~ currentState
 
 --
 
-view toolsChannel (w,h) state =
+view (w,h) state =
   let strW = toString w
       strH = toString h
       strViewBox = "0 0 " ++ strW ++ " " ++ strH
@@ -149,7 +175,8 @@ view toolsChannel (w,h) state =
   in
       Html.div [ rootStyle ]
         [ Svg.svg
-            [ SA.width strW, SA.height strH, SA.viewBox strViewBox ]
+            [ SA.width strW, SA.height strH, SA.viewBox strViewBox
+            , onClick (Signal.send selectChannel UnselectAllFigures) ]
             (List.append
               (List.map drawRegularFigure state.figures)
               [ showMouseDragging ])
@@ -157,7 +184,7 @@ view toolsChannel (w,h) state =
             (List.concat
               [ [ Html.div
                     [ toolbarStyle ]
-                    (List.map (toolbarButton toolsChannel) state.tools) ]
+                    (List.map toolbarButton state.tools) ]
               , [ Html.div
                     [ debugTextStyle ]
                     [ Html.text <| (toString state) ] ]
@@ -168,21 +195,33 @@ drawRegularFigure = drawFigure pColor "0.85"
 drawTempFigure = drawFigure sColor "0.5"
 
 drawFigure color opacity' fig =
-  case fig.type' of
-    Rectangle -> drawRectangle color opacity' fig
-    Circle -> drawCircle color opacity' fig
+  let strokeAttrs =
+        if fig.status == Selected
+          then [ SA.stroke selColor, SA.strokeWidth "2" ]
+          else []
+      commonAttrs =
+        List.concat
+          [ [ SA.fill color, SA.fillOpacity opacity' ]
+          , [ onClick (Signal.send selectChannel (SelectFigure fig.id)) ]
+          , strokeAttrs
+          ]
+  in
+      case fig.type' of
+        Rectangle -> drawRectangle fig commonAttrs
+        Circle -> drawCircle fig commonAttrs
 
-drawRectangle color opacity' fig =
+drawRectangle fig commonAttrs =
   let strX = toString (if fig.x1 < fig.x2 then fig.x1 else fig.x2)
       strY = toString (if fig.y1 < fig.y2 then fig.y1 else fig.y2)
       strW = toString <| abs <| fig.x1 - fig.x2
       strH = toString <| abs <| fig.y1 - fig.y2
   in
       Svg.rect
-        [ SA.fill color, SA.fillOpacity opacity'
-        , SA.x strX, SA.y strY, SA.width strW, SA.height strH ][]
+        (List.append
+          commonAttrs
+          [ SA.x strX, SA.y strY, SA.width strW, SA.height strH ])[]
 
-drawCircle color opacity' fig =
+drawCircle fig commonAttrs =
   let halfW = (fig.x2 - fig.x1) // 2
       halfH = (fig.y2 - fig.y1) // 2
       strCX = toString <| fig.x1 + halfW
@@ -191,15 +230,16 @@ drawCircle color opacity' fig =
       strRY = toString <| abs <| halfH
   in
       Svg.ellipse
-        [ SA.fill color, SA.fillOpacity opacity'
-        , SA.cx strCX, SA.cy strCY, SA.rx strRX, SA.ry strRY ][]
+        (List.append
+          commonAttrs
+          [ SA.cx strCX, SA.cy strCY, SA.rx strRX, SA.ry strRY ])[]
 
 drawEmptyFigure =
   Svg.rect
     [ SA.fill "#fff", SA.opacity "0"
     , SA.x "0", SA.y "0", SA.width "0", SA.height "0" ] []
 
-toolbarButton toolsChannel { name, active, icon } =
+toolbarButton { name, active, icon } =
   Html.button
     [ (toolbarToolStyle active)
     , onClick (Signal.send toolsChannel (SetActiveTool name))
