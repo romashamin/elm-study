@@ -1,42 +1,46 @@
 import Signal
 import Signal (Signal, (<~), (~))
 import Mouse
-import Keyboard
-import Time
 import Html
 import Html.Events (onClick)
-import Text (asText)
 
-type Action = NoOp | Increase | Decrease | KeyboardArrows { x:Int, y:Int }
+type Input = ToggleStatus | MousePosition (Int,Int)
+type alias State = { pos:(Int,Int), status:Bool }
 
-state = { value = 0 }
+state : State
+state = { pos = (0,0), status = False }
 
 update action state =
   case action of
-    NoOp -> state
-    Increase -> { state | value <- state.value + 1 }
-    Decrease -> { state | value <- state.value - 1 }
-    KeyboardArrows {x,y} -> { state | value <- state.value + y + x }
+    ToggleStatus -> { state | status <- not state.status }
+    MousePosition pos' -> { state | pos <- pos' }
 
-updates = Signal.channel NoOp
+updates = Signal.channel ToggleStatus
 
-delta = Signal.map (\t -> t / 20) (Time.fps 15)
-
-keyboardArrows = Signal.sampleOn delta Keyboard.arrows
+{-| It’s impossible to filter signals with state status.
+    The solution is to make for every tool its own `update` function:
+    https://groups.google.com/d/msg/elm-discuss/rzzDCc7hepY/Emm2KqBOHEIJ
+-}
+filteredMouse =
+  Signal.keepIf (\_ -> state.status) (9,9) Mouse.position
 
 input =
-  Signal.merge
-    (Signal.subscribe updates)
-    (Signal.map KeyboardArrows keyboardArrows)
+  let filteredMouse =
+        if state.status then Mouse.position else Signal.constant (0,0)
+  in
+      Signal.merge
+        (Signal.subscribe updates)
+        (Signal.map MousePosition Mouse.position)
 
 stateSignal = Signal.foldp update state input
 
-view updates state =
+view state =
   Html.div []
-    [ Html.button [ onClick <| Signal.send updates Decrease ] [ Html.text "–" ]
-    , Html.text <| " " ++ toString state.value ++ " "
-    , Html.button [ onClick <| Signal.send updates Increase ] [ Html.text "+" ]
+    [ Html.text <| toString state ++ " "
+    , Html.button
+        [ onClick <| Signal.send updates ToggleStatus ]
+        [ Html.text "Toggle" ]
     ]
 
 main : Signal Html.Html
-main = (view updates) <~ stateSignal
+main = view <~ stateSignal
